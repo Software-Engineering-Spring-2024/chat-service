@@ -15,6 +15,7 @@ import "../styles/Chat.css";
 export const Chat = ({ room }) => {
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState("");
+  const [expanded, setExpanded] = useState(false); // State to manage expansion
   const messagesRef = collection(db, "messages");
 
   useEffect(() => {
@@ -49,30 +50,42 @@ export const Chat = ({ room }) => {
     setNewMessage("");
   };
 
+  const handleExpand = () => {
+    setExpanded(!expanded);
+  };
+
   return (
-    <div className="chat-app">
-      <div className="header">
-        <h1>Welcome to: {room.toUpperCase()}</h1>
-      </div>
-      <div className="messages">
-        {messages.map((message) => (
-          <div key={message.id} className="message">
-            <span className="user">{message.user}:</span> {message.text}
+    <div className={`chat-app ${expanded ? 'expanded' : ''}`}>
+      {expanded && ( // Show chat content if expanded
+        <>
+          <div className="header">
+            <h1>Welcome to: {room.toUpperCase()}</h1>
           </div>
-        ))}
-      </div>
-      <form onSubmit={handleSubmit} className="new-message-form">
-        <input
-          type="text"
-          value={newMessage}
-          onChange={(event) => setNewMessage(event.target.value)}
-          className="new-message-input"
-          placeholder="Type your message here..."
-        />
-        <button type="submit" className="send-button">
-          Send
-        </button>
-      </form>
+          <div className="messages">
+            {messages.map((message) => (
+              <div key={message.id} className="message">
+                <span className="user">{message.user}:</span> {message.text}
+              </div>
+            ))}
+          </div>
+          <form onSubmit={handleSubmit} className="new-message-form">
+            <input
+              type="text"
+              value={newMessage}
+              onChange={(event) => setNewMessage(event.target.value)}
+              className="new-message-input"
+              placeholder="Type your message here..."
+            />
+            <button type="submit" className="send-button">
+              Send
+            </button>
+          </form>
+        </>
+      )}
+      {/* Button to expand/collapse chat */}
+      <button onClick={handleExpand} className={`expand-button ${expanded ? 'expanded' : ''}`}>
+        {expanded ? 'Close Chat' : 'Open Chat'}
+      </button>
     </div>
   );
 };
