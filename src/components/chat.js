@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from "react";
-import { db, auth } from "../firebase-config";
+import React, { useState, useEffect, useRef } from 'react';
+import { db, auth } from '../firebase-config';
 import {
   collection,
   addDoc,
@@ -8,84 +8,102 @@ import {
   onSnapshot,
   query,
   orderBy,
-} from "firebase/firestore";
-
-import "../styles/Chat.css";
+  // you would add 'updateDoc' and 'doc' imports here if you're implementing read receipts
+} from 'firebase/firestore';
+import '../styles/Chat.css';
 
 export const Chat = ({ room }) => {
   const [messages, setMessages] = useState([]);
-  const [newMessage, setNewMessage] = useState("");
-  const [expanded, setExpanded] = useState(false); // State to manage expansion
-  const messagesRef = collection(db, "messages");
+  const [newMessage, setNewMessage] = useState('');
+  const [isTyping, setIsTyping] = useState(false);
+  const typingTimeoutRef = useRef(null);
+  const messagesRef = collection(db, 'messages');
+  const [expanded, setExpanded] = useState(true); 
 
   useEffect(() => {
-    const queryMessages = query(
-      messagesRef,
-      where("room", "==", room),
-      orderBy("createdAt")
-    );
-    const unsuscribe = onSnapshot(queryMessages, (snapshot) => {
+    const q = query(messagesRef, where('room', '==', room), orderBy('createdAt'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
       let messages = [];
       snapshot.forEach((doc) => {
         messages.push({ ...doc.data(), id: doc.id });
+        // Here you would check if the message is read and add a 'read' field to the message object
       });
-      console.log(messages);
       setMessages(messages);
     });
 
-    return () => unsuscribe();
-  }, []);
+    return () => unsubscribe();
+  }, [room]);
+
+  const handleNewMessageChange = (event) => {
+    setNewMessage(event.target.value);
+
+    if (!isTyping) {
+      setIsTyping(true);
+      // Here you would inform the backend that the user is typing
+    }
+    clearTimeout(typingTimeoutRef.current);
+    typingTimeoutRef.current = setTimeout(() => {
+      setIsTyping(false);
+      // Here you would inform the backend that the user stopped typing
+    }, 1000);
+  };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
 
-    if (newMessage === "") return;
+    if (newMessage.trim() === '') return;
+
     await addDoc(messagesRef, {
-      text: newMessage,
+      text: newMessage.trim(),
       createdAt: serverTimestamp(),
       user: auth.currentUser.displayName,
       room,
+      // You would also set a 'read' field to false initially here
     });
 
-    setNewMessage("");
+    setNewMessage('');
+    setIsTyping(false);
+    clearTimeout(typingTimeoutRef.current);
   };
 
-  const handleExpand = () => {
+  const toggleExpand = () => {
     setExpanded(!expanded);
   };
 
   return (
-    <div className={`chat-app ${expanded ? 'expanded' : ''}`}>
-      {expanded && ( // Show chat content if expanded
+    <div className={`chat-container ${expanded ? '' : 'collapsed'}`}>
+      {expanded ? (
         <>
-          <div className="header">
-            <h1>Welcome to: {room.toUpperCase()}</h1>
+      <div className='chat-header'>
+        <h1>Welcome to: {room.toUpperCase()}</h1>
+        <button onClick={toggleExpand} className='chat-toggle-button'>-</button>
+      </div>
+      <div className='chat-messages'>
+        {messages.map((message) => (
+          <div key={message.id} className='chat-message'>
+            <span className='chat-message-user'>{message.user}:</span>
+            {message.text}
+            {/* Here you would display a 'read' badge if the message has been read */}
           </div>
-          <div className="messages">
-            {messages.map((message) => (
-              <div key={message.id} className="message">
-                <span className="user">{message.user}:</span> {message.text}
-              </div>
-            ))}
-          </div>
-          <form onSubmit={handleSubmit} className="new-message-form">
-            <input
-              type="text"
-              value={newMessage}
-              onChange={(event) => setNewMessage(event.target.value)}
-              className="new-message-input"
-              placeholder="Type your message here..."
-            />
-            <button type="submit" className="send-button">
-              Send
-            </button>
-          </form>
-        </>
+        ))}
+        {isTyping && <div className='typing-indicator'>User is typing...</div>}
+      </div>
+      <form onSubmit={handleSubmit} className='chat-input-form'>
+        <input
+          type='text'
+          value={newMessage}
+          onChange={handleNewMessageChange}
+          className='chat-input'
+          placeholder='Type your message here...'
+        />
+        <button type='submit' className='chat-submit-button'>
+          Send
+        </button>
+      </form>
+      </>
+      ) : (
+        <button onClick={toggleExpand} className='chat-toggle-button'>+</button>
       )}
-      {/* Button to expand/collapse chat */}
-      <button onClick={handleExpand} className={`expand-button ${expanded ? 'expanded' : ''}`}>
-        {expanded ? 'Close Chat' : 'Open Chat'}
-      </button>
     </div>
   );
 };
